@@ -1,0 +1,17 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+location        = "westeurope"
+prefix          = "plat"
+environment     = "prod"
+
+# Break-glass cluster-admin group only. Grant day-to-day access with
+# "Azure Kubernetes Service RBAC Writer/Reader" at namespace scope.
+admin_group_object_ids = ["11111111-1111-1111-1111-111111111111"]
+
+# CI runner and VPN egress ranges. Service tags are also accepted by AKS.
+api_server_authorized_ip_ranges = ["203.0.113.0/24"]
+
+apps_os_sku           = "AzureLinux3" # or "AzureContainerLinux" / "Ubuntu2404"
+enable_kms_cmk        = false         # 1.37+ already encrypts etcd with a platform key
+safeguards_level      = "Enforce"
+safeguards_pss_level  = "Restricted"
+safeguards_excluded_namespaces = ["platform-system"]

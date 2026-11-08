@@ -1,0 +1,23 @@
+{
+  "name": "aks-plat-prod",
+  "kubernetesVersion": "1.37",
+  "currentKubernetesVersion": "1.37.1",
+  "disableLocalAccounts": true,
+  "aadProfile": { "managed": true, "enableAzureRbac": true },
+  "oidcIssuerProfile": { "enabled": true },
+  "apiServerAccessProfile": {
+    "authorizedIpRanges": ["203.0.113.0/24"],
+    "disableRunCommand": true,
+    "enablePrivateCluster": false,
+    "enableVnetIntegration": true
+  },
+  "networkProfile": { "networkPlugin": "azure", "networkPluginMode": "overlay", "networkDataplane": "cilium", "networkPolicy": "cilium" },
+  "addonProfiles": { "azurepolicy": { "enabled": true } },
+  "autoUpgradeProfile": { "upgradeChannel": "patch", "nodeOsUpgradeChannel": "NodeImage" },
+  "securityProfile": {
+    "workloadIdentity": { "enabled": true },
+    "imageCleaner": { "enabled": true, "intervalHours": 48 },
+    "defender": { "securityMonitoring": { "enabled": true } },
+    "azureKeyVaultKms": null
+  }
+}

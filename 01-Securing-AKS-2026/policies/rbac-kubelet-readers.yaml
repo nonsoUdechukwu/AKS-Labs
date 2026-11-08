@@ -1,0 +1,23 @@
+# What a metrics/log agent actually needs from the kubelet on 1.36+.
+# Each kubelet path maps to its own subresource; anything unmapped (including /exec,
+# /run, /attach, /portForward) still requires nodes/proxy.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubelet-telemetry-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes/metrics", "nodes/stats", "nodes/pods", "nodes/healthz"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubelet-log-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes/log"]
+    verbs: ["get"]

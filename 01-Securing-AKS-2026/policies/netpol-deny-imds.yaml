@@ -1,0 +1,26 @@
+# Block pod access to the Azure Instance Metadata Service (IMDS) per namespace.
+# Without this (or the IMDS restriction preview), any pod can ask IMDS for a token of
+# the node's kubelet identity, which usually has AcrPull and sometimes much more.
+#
+# The "except" must sit inside the range you allow: 0.0.0.0/0 except 169.254.169.254/32
+# allows everything but IMDS. Two variants that circulate don't work as written:
+#   10.10.0.0/16 except 169.254.169.254/32 -> rejected ("must be a strict subset")
+#   10.10.0.0/0  except 169.254.169.254/32 -> rejected from 1.36 (StrictIPCIDRValidation)
+# test/security_test.go proves all three against a real API server.
+#
+# NetworkPolicies are additive: another policy that allows 0.0.0.0/0 for the same pods
+# re-opens IMDS. Pair this with a policy check (or AKS IMDS restriction) for that reason.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-imds-egress
+  namespace: payments
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32

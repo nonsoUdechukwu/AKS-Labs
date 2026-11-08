@@ -1,0 +1,14 @@
+[
+  {
+    "name": "nodepool1", "mode": "System", "osType": "Linux", "osSku": "Ubuntu2204",
+    "nodeImageVersion": "AKSUbuntu-2204gen2containerd-202603.18.0",
+    "enableEncryptionAtHost": false, "enableNodePublicIp": true,
+    "securityProfile": { "enableSecureBoot": false, "enableVtpm": false, "sshAccess": "LocalUser" }
+  },
+  {
+    "name": "win", "mode": "User", "osType": "Windows", "osSku": "Windows2022",
+    "nodeImageVersion": "AKSWindows-2022-containerd-20348.4171.260410",
+    "enableEncryptionAtHost": false, "enableNodePublicIp": false,
+    "securityProfile": null
+  }
+]

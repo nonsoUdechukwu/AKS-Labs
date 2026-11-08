@@ -1,0 +1,15 @@
+# Tenant namespace with Pod Security Admission at "restricted", pinned to the
+# policy version of the cluster ("latest"). Deployment Safeguards (Restricted)
+# gives you the same floor cluster-wide; the namespace label also protects you
+# in clusters where safeguards are in Warn, or excluded for this namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+    # Opt-in to vap-require-userns.yaml: every pod here must run in its own user namespace.
+    security.platform/user-namespaces: required

@@ -1,0 +1,18 @@
+# Common variant. Semantically IMDS would be blocked only because
+# everything outside 10.10.0.0/16 is blocked (the except is a no-op), and the API
+# server rejects it anyway: except entries must be a strict subset of cidr.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: restrict-instance-metadata-16
+spec:
+  podSelector:
+    matchLabels: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.10.0.0/16
+            except:
+              - 169.254.169.254/32

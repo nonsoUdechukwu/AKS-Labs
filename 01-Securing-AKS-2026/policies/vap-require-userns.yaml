@@ -1,0 +1,47 @@
+# User namespaces (hostUsers: false) are GA in Kubernetes 1.36 and supported on AKS
+# 1.33+ with Azure Linux 3.0 or Ubuntu 24.04 nodes. Root in the container maps to an
+# unprivileged UID range on the host, which defuses a whole class of container breakouts.
+# Namespaces opt in with the label security.platform/user-namespaces=required.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: require-user-namespaces
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs", "cronjobs"]
+  variables:
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec :
+        object.spec.template.spec
+  validations:
+    - expression: "has(variables.podSpec.hostUsers) && variables.podSpec.hostUsers == false"
+      messageExpression: >-
+        object.kind + ' ' + object.metadata.name + ' must set spec.hostUsers: false (user namespaces are required in namespace ' + object.metadata.namespace + ').'
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: require-user-namespaces
+spec:
+  policyName: require-user-namespaces
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        security.platform/user-namespaces: required

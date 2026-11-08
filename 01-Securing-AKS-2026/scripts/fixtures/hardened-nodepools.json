@@ -1,0 +1,14 @@
+[
+  {
+    "name": "system", "mode": "System", "osType": "Linux", "osSku": "AzureLinux3",
+    "nodeImageVersion": "AKSAzureLinux-V3gen2-202610.14.0",
+    "enableEncryptionAtHost": true, "enableNodePublicIp": false,
+    "securityProfile": { "enableSecureBoot": true, "enableVtpm": true, "sshAccess": "Disabled" }
+  },
+  {
+    "name": "apps", "mode": "User", "osType": "Linux", "osSku": "AzureContainerLinux",
+    "nodeImageVersion": "AKSAzureContainerLinux-gen2-202610.20.0",
+    "enableEncryptionAtHost": true, "enableNodePublicIp": false,
+    "securityProfile": { "enableSecureBoot": true, "enableVtpm": true, "sshAccess": "Disabled" }
+  }
+]

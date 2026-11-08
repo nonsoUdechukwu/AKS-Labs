@@ -1,0 +1,56 @@
+# nodes/proxy is "exec into any pod on the node": with GET alone a client can open a
+# WebSocket to the kubelet's /exec endpoint. Since Kubernetes 1.36 (fine-grained kubelet
+# authorization, GA) monitoring and log agents don't need it any more: grant
+# nodes/metrics, nodes/stats, nodes/log, nodes/pods instead (rbac-kubelet-readers.yaml).
+#
+# AKS Automatic blocks nodes/proxy by default. On AKS Standard you add the guardrail
+# yourself. The apiserver's own bootstrap roles (system:kubelet-api-admin) are written by
+# system:masters and are exempt, as is an explicit platform approvers group.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: deny-nodes-proxy-grants
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+  matchConditions:
+    - name: not-bootstrap-or-approved
+      # Replace with the Entra group object ID that may approve exceptions.
+      expression: >-
+        !request.userInfo.groups.exists(g, g in ['system:masters', 'aks-nodes-proxy-approvers'])
+  variables:
+    - name: isRole
+      expression: object.kind in ['Role', 'ClusterRole']
+    - name: grantsNodesProxy
+      expression: >-
+        variables.isRole && has(object.rules) && object.rules.exists(r,
+          has(r.resources) &&
+          (!has(r.apiGroups) || r.apiGroups.exists(g, g == '' || g == '*')) &&
+          r.resources.exists(x, x in ['nodes/proxy', 'nodes/*', '*']))
+    - name: bindsKubeletAdmin
+      expression: >-
+        !variables.isRole && object.roleRef.kind == 'ClusterRole' &&
+        object.roleRef.name in ['system:kubelet-api-admin', 'cluster-admin', 'system:node']
+        && has(object.subjects) && object.subjects.exists(s, s.kind == 'ServiceAccount')
+  validations:
+    - expression: "!variables.grantsNodesProxy"
+      messageExpression: >-
+        object.kind + ' ' + object.metadata.name + ' grants nodes/proxy (equivalent to exec on every pod on the node). Use nodes/metrics, nodes/stats, nodes/log or nodes/pods instead.'
+      reason: Forbidden
+    - expression: "!variables.bindsKubeletAdmin"
+      messageExpression: >-
+        object.kind + ' ' + object.metadata.name + ' binds a service account to ' + object.roleRef.name + '. Request an exception from the platform team.'
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: deny-nodes-proxy-grants
+spec:
+  policyName: deny-nodes-proxy-grants
+  validationActions: ["Deny", "Audit"]

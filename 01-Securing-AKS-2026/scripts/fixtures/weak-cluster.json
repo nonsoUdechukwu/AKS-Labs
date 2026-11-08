@@ -1,0 +1,14 @@
+{
+  "name": "aks-legacy",
+  "kubernetesVersion": "1.33",
+  "currentKubernetesVersion": "1.33.5",
+  "disableLocalAccounts": false,
+  "aadProfile": null,
+  "oidcIssuerProfile": { "enabled": false },
+  "podIdentityProfile": { "enabled": true },
+  "apiServerAccessProfile": null,
+  "networkProfile": { "networkPlugin": "kubenet", "networkPolicy": null },
+  "addonProfiles": {},
+  "autoUpgradeProfile": { "upgradeChannel": "none", "nodeOsUpgradeChannel": "Unmanaged" },
+  "securityProfile": {}
+}
