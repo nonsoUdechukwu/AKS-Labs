@@ -1,0 +1,16 @@
+# Platform-owned namespace for the shared Gateway (Gateway API "cluster operator" role).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-gateways
+  labels:
+    platform.contoso.io/owner: platform
+---
+# App namespaces opt in to the shared Gateway with this label.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shop
+  labels:
+    platform.contoso.io/owner: team-shop
+    gateway-access: shared

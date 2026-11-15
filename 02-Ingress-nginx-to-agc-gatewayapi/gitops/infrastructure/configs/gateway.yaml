@@ -1,0 +1,55 @@
+# BYO deployment: Terraform owns the AGC + frontend. The Gateway only
+# references them, so deleting/re-creating it never changes the FQDN.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared-public
+  namespace: ingress-gateways
+  annotations:
+    alb.networking.azure.io/alb-id: "${ALB_ID}"
+spec:
+  gatewayClassName: azure-alb-external
+  addresses:
+    - type: alb.networking.azure.io/alb-frontend
+      value: "${ALB_FRONTEND}"
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: "*.${DNS_ZONE}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: wildcard-tls
+      allowedRoutes:
+        kinds:
+          - kind: HTTPRoute
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway-access: shared
+---
+# Replaces nginx.ingress.kubernetes.io/ssl-redirect / force-ssl-redirect for every host.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-to-https
+  namespace: ingress-gateways
+spec:
+  parentRefs:
+    - name: shared-public
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

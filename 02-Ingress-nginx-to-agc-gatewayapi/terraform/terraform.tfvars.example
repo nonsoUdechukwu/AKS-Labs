@@ -1,0 +1,7 @@
+subscription_id     = "00000000-0000-0000-0000-000000000000"
+location            = "westeurope"
+environment         = "prod"
+dns_zone_name       = "contoso.example"
+gitops_repo_url     = "https://github.com/contoso/aks-platform-gitops"
+admin_allowed_cidrs = ["203.0.113.0/24"]
+waf_mode            = "Detection"

@@ -1,0 +1,19 @@
+# DNS-01 wildcard: no HTTP-01 solver route needed on the Gateway,
+# and certificates can be issued before DNS is cut over.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard
+  namespace: ingress-gateways
+spec:
+  secretName: wildcard-tls
+  dnsNames:
+    - "${DNS_ZONE}"
+    - "*.${DNS_ZONE}"
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always

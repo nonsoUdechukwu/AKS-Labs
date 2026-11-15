@@ -1,0 +1,58 @@
+# Owned by team-shop (Gateway API "application developer" role).
+# Attaches to the platform Gateway; cannot change listeners, TLS or WAF baseline.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web
+spec:
+  parentRefs:
+    - name: shared-public
+      namespace: ingress-gateways
+      sectionName: https
+  hostnames:
+    - "shop.${DNS_ZONE}"
+  rules:
+    # Replaces nginx canary-by-header: testers pin themselves to v2.
+    - matches:
+        - path: {type: PathPrefix, value: /}
+          headers:
+            - {type: Exact, name: X-Canary, value: always}
+      backendRefs:
+        - {name: web-v2, port: 80}
+    # Replaces canary + canary-weight: first-class weighted split, no second Ingress.
+    - matches:
+        - path: {type: PathPrefix, value: /}
+      backendRefs:
+        - {name: web-v1, port: 80, weight: 90}
+        - {name: web-v2, port: 80, weight: 10}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api
+spec:
+  parentRefs:
+    - name: shared-public
+      namespace: ingress-gateways
+      sectionName: https
+  hostnames:
+    - "shop.${DNS_ZONE}"
+  rules:
+    # Replaces rewrite-target: /$2 with path /api(/|$)(.*): AGC has no regex,
+    # ReplacePrefixMatch gives the same result for this (very common) pattern.
+    - matches:
+        - path: {type: PathPrefix, value: /api}
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+        # Replaces configuration-snippet "more_set_headers" / custom-headers.
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - {name: Strict-Transport-Security, value: "max-age=31536000; includeSubDomains"}
+              - {name: X-Content-Type-Options, value: nosniff}
+      backendRefs:
+        - {name: api, port: 80}

@@ -1,0 +1,34 @@
+// AGC showback: split the monthly AGC bill across teams by their share of traffic.
+// Source: AGCAccessLogs (resource-specific table; diagnostic setting in terraform/main.tf).
+// Fixed meters (AGC + association + frontends) are split by request share,
+// capacity-unit cost by byte share (bytes are the closest proxy for CU: 2.22 Mbps per CU).
+let periodStart = startofmonth(ago(1d));
+let periodEnd   = endofmonth(ago(1d));
+let fixedMonthlyUsd = 157.0;   // AGC + association + frontend(s) line items from Cost Management
+let cuMonthlyUsd    = 40.0;    // capacity-unit line item for the same period
+// First DNS label -> owning team. Keep this table in Git next to the HTTPRoutes.
+let owners = datatable(Prefix:string, Team:string) [
+    "shop", "team-shop",
+    "pay",  "team-payments",
+    "api",  "team-platform-api"
+];
+let usage = AGCAccessLogs
+    | where TimeGenerated between (periodStart .. periodEnd)
+    | extend Prefix = tostring(split(HostName, ".")[0]),
+             Bytes = RequestHeaderBytes + RequestBodyBytes + ResponseHeaderBytes + ResponseBodyBytes
+    | lookup kind=leftouter owners on Prefix
+    | extend Team = coalesce(Team, "unallocated")
+    | summarize Requests = count(), Bytes = sum(Bytes),
+                Errors5xx = countif(HttpStatusCode >= 500),
+                P95TimeTakenMs = percentile(TimeTaken, 95),
+                Hosts = make_set(HostName, 20)
+              by Team;
+let totals = usage | summarize R = sum(Requests), B = sum(Bytes);
+usage
+| extend ReqShare  = todouble(Requests) / toscalar(totals | project R),
+         ByteShare = todouble(Bytes)    / toscalar(totals | project B)
+| extend ShowbackUsd = round(fixedMonthlyUsd * ReqShare + cuMonthlyUsd * ByteShare, 2)
+| project Team, Hosts, Requests, GiB = round(Bytes / 1073741824.0, 2),
+          ReqShare = round(ReqShare, 3), ByteShare = round(ByteShare, 3),
+          ShowbackUsd, Errors5xx, P95TimeTakenMs
+| order by ShowbackUsd desc

@@ -1,0 +1,37 @@
+# Replaces affinity: cookie + proxy-read-timeout. "default" only; AGC rejects "override".
+apiVersion: alb.networking.azure.io/v1
+kind: RoutePolicy
+metadata:
+  name: web
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: web
+  default:
+    sessionAffinity:
+      affinityType: managed-cookie
+    timeouts:
+      routeTimeout: 60s
+---
+# Readiness at the edge: AGC probes pods directly, so point it at a real health endpoint.
+apiVersion: alb.networking.azure.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: api
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: api
+  default:
+    interval: 5s
+    timeout: 3s
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    port: 9898
+    http:
+      path: /readyz
+      match:
+        statusCodes:
+          - {start: 200, end: 299}

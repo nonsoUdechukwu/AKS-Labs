@@ -1,0 +1,41 @@
+# Migration ratchet: existing nginx Ingresses keep working (UPDATE/DELETE allowed)
+# but nobody can CREATE a new one. The legacy surface can only shrink.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: deny-new-nginx-ingress
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["networking.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["ingresses"]
+  variables:
+    - name: legacyClasses
+      expression: "['nginx', 'webapprouting.kubernetes.azure.com', 'nginx-internal']"
+    - name: className
+      expression: >-
+        has(object.spec.ingressClassName) ? object.spec.ingressClassName :
+        (has(object.metadata.annotations) && 'kubernetes.io/ingress.class' in object.metadata.annotations
+          ? object.metadata.annotations['kubernetes.io/ingress.class'] : '')
+  validations:
+    - expression: "!(variables.className in variables.legacyClasses)"
+      messageExpression: >-
+        'ingress class "' + variables.className + '" is frozen (ingress-nginx is end-of-life). ' +
+        'Create an HTTPRoute attached to Gateway ingress-gateways/shared-public instead. See https://platform.contoso.io/docs/gateway'
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: deny-new-nginx-ingress
+spec:
+  policyName: deny-new-nginx-ingress
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - key: platform.contoso.io/ingress-exempt
+          operator: DoesNotExist

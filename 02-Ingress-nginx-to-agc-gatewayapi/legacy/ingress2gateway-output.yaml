@@ -1,0 +1,146 @@
+# Raw output of: ingress2gateway v1.2.0 print --providers=ingress-nginx --input-file legacy/ingress-nginx.yaml
+# Kept unedited on purpose: see ARTICLE.md for why this is a starting point, not a deliverable on AGC.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  annotations:
+    gateway.networking.k8s.io/generator: ingress2gateway-dev
+  name: nginx
+  namespace: shop
+spec:
+  gatewayClassName: nginx
+  listeners:
+  - hostname: shop.contoso.example
+    name: shop-contoso-example-http
+    port: 80
+    protocol: HTTP
+  - hostname: shop.contoso.example
+    name: shop-contoso-example-https
+    port: 443
+    protocol: HTTPS
+    tls:
+      certificateRefs:
+      - group: ""
+        kind: Secret
+        name: shop-tls
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  annotations:
+    gateway.networking.k8s.io/generator: ingress2gateway-dev
+  name: api-shop-contoso-example
+  namespace: shop
+spec:
+  hostnames:
+  - shop.contoso.example
+  parentRefs:
+  - name: nginx
+    port: 443
+    sectionName: shop-contoso-example-https
+  rules:
+  - backendRefs:
+    - name: api
+      port: 80
+    matches:
+    - path:
+        type: RegularExpression
+        value: (?i)/api(/|$)(.*).*
+  - backendRefs:
+    - name: web-v1
+      port: 80
+      weight: 90
+    - name: web-v2
+      port: 80
+      weight: 10
+    matches:
+    - path:
+        type: RegularExpression
+        value: (?i)(?i)(?i)/.*.*.*
+    timeouts:
+      request: 10m0s
+  - backendRefs:
+    - name: web-v2
+      port: 80
+    matches:
+    - headers:
+      - name: X-Canary
+        value: always
+      path:
+        type: RegularExpression
+        value: (?i)(?i)(?i)/.*.*.*
+    timeouts:
+      request: 10m0s
+  - backendRefs:
+    - name: web-v1
+      port: 80
+    matches:
+    - headers:
+      - name: X-Canary
+        value: never
+      path:
+        type: RegularExpression
+        value: (?i)(?i)(?i)/.*.*.*
+    timeouts:
+      request: 10m0s
+status:
+  parents: []
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  annotations:
+    gateway.networking.k8s.io/generator: ingress2gateway-dev
+  name: api-shop-contoso-example-http
+  namespace: shop
+spec:
+  hostnames:
+  - shop.contoso.example
+  parentRefs:
+  - name: nginx
+    port: 80
+  rules:
+  - filters:
+    - requestRedirect:
+        scheme: https
+        statusCode: 308
+      type: RequestRedirect
+    matches:
+    - path:
+        type: RegularExpression
+        value: (?i)/api(/|$)(.*).*
+  - filters:
+    - requestRedirect:
+        scheme: https
+        statusCode: 308
+      type: RequestRedirect
+    matches:
+    - path:
+        type: RegularExpression
+        value: (?i)(?i)(?i)/.*.*.*
+  - filters:
+    - requestRedirect:
+        scheme: https
+        statusCode: 308
+      type: RequestRedirect
+    matches:
+    - headers:
+      - name: X-Canary
+        value: always
+      path:
+        type: RegularExpression
+        value: (?i)(?i)(?i)/.*.*.*
+  - filters:
+    - requestRedirect:
+        scheme: https
+        statusCode: 308
+      type: RequestRedirect
+    matches:
+    - headers:
+      - name: X-Canary
+        value: never
+      path:
+        type: RegularExpression
+        value: (?i)(?i)(?i)/.*.*.*
+status:
+  parents: null
