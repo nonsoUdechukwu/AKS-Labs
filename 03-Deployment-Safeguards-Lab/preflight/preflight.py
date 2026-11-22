@@ -45,8 +45,12 @@ RULES = {
     r.id: r
     for r in [
         Rule("DS-LATEST-TAG", "warn", "deny"),
-        Rule("DS-PROBES", "warn", "deny"),
+        # Observed on AKS: the probes safeguard stays at warn under Enforce.
+        Rule("DS-PROBES", "warn", "warn"),
         Rule("DS-REQUESTS", "warn", "mutate"),
+        # The mutator only rewrites workload templates; a bare Pod without requests is denied
+        # (unless a namespace LimitRange fills them in first, which this linter can't see).
+        Rule("DS-REQUESTS-POD", "warn", "deny"),
         Rule("DS-REQUEST-FLOOR", None, "mutate"),
         Rule("DS-ANTI-AFFINITY", "warn", "mutate"),
         Rule("DS-RESERVED-LABEL", "warn", "deny"),
@@ -121,7 +125,10 @@ def check_workload(doc: dict, ref: str) -> list[tuple[str, str]]:
         res = c.get("resources") or {}
         req, lim = res.get("requests") or {}, res.get("limits") or {}
         if "cpu" not in req or "memory" not in req:
-            out.append(("DS-REQUESTS", f"container {name} has no cpu/memory requests (Enforce sets 500m / 2048Mi)"))
+            if doc.get("kind") == "Pod":
+                out.append(("DS-REQUESTS-POD", f"container {name} has no cpu/memory requests (bare Pods are denied, not mutated)"))
+            else:
+                out.append(("DS-REQUESTS", f"container {name} has no cpu/memory requests (Enforce sets 500m / 2048Mi)"))
         floors = {"cpu": 100, "memory": 100}
         for bucket in (req, lim):
             for r, floor in floors.items():
@@ -136,7 +143,8 @@ def check_workload(doc: dict, ref: str) -> list[tuple[str, str]]:
 
     labels = {**((doc.get("metadata") or {}).get("labels") or {}), **(tpl_meta.get("labels") or {})}
     for key in labels:
-        if key.split("/", 1)[0] == "kubernetes.azure.com":
+        # The safeguard matches the exact key; kubernetes.azure.com/<name> keys are admitted.
+        if key == "kubernetes.azure.com":
             out.append(("DS-RESERVED-LABEL", f"label {key} is reserved for AKS"))
 
     # Pod Security Standards: Baseline
@@ -191,7 +199,7 @@ def check_workload(doc: dict, ref: str) -> list[tuple[str, str]]:
 
 def evaluate(docs: list[dict], level: str, pss: str, excluded: set[str]) -> list[Finding]:
     findings: list[Finding] = []
-    selectors: dict[tuple[str, str], str] = {}
+    services: dict[tuple[str, str], list[tuple[str, set[str]]]] = {}
     for doc in docs:
         if not isinstance(doc, dict) or "kind" not in doc:
             continue
@@ -208,13 +216,16 @@ def evaluate(docs: list[dict], level: str, pss: str, excluded: set[str]) -> list
             if prov in ("kubernetes.io/azure-disk", "kubernetes.io/azure-file"):
                 raw = [("DS-CSI-STORAGECLASS", f"in-tree provisioner {prov}; use disk.csi.azure.com or file.csi.azure.com")]
         elif doc["kind"] == "Service":
-            sel = (doc.get("spec") or {}).get("selector")
-            if sel:
+            spec = doc.get("spec") or {}
+            sel = spec.get("selector")
+            # Headless Services are skipped, and a clash needs an overlapping port/protocol pair.
+            if sel and spec.get("clusterIP") != "None":
+                ports = {f"{p.get('protocol', 'TCP')}:{p.get('port')}" for p in spec.get("ports") or []} or {"__no_ports__"}
                 key = (ns, yaml.safe_dump(sel, sort_keys=True))
-                if key in selectors:
-                    raw = [("DS-UNIQUE-SELECTOR", f"selector {sel} already used by Service {selectors[key]}")]
-                else:
-                    selectors[key] = meta.get("name", "?")
+                clash = next((other for other, other_ports in services.get(key, []) if ports & other_ports), None)
+                if clash:
+                    raw = [("DS-UNIQUE-SELECTOR", f"selector {sel} and port(s) {sorted(ports)} already used by Service {clash}")]
+                services.setdefault(key, []).append((meta.get("name", "?"), ports))
         for rule_id, msg in raw:
             rule = RULES[rule_id]
             if rule.pss and PSS_ORDER[pss] < PSS_ORDER[rule.pss]:

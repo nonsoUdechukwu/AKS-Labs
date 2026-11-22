@@ -1,4 +1,5 @@
-# S08: kubernetes.azure.com label prefix is reserved for AKS. Warn -> warning, Enforce -> denied.
+# S08: the label key kubernetes.azure.com is reserved for AKS. Warn -> warning, Enforce -> denied.
+# The safeguard matches the exact key only: kubernetes.azure.com/<anything> is admitted.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,7 +16,7 @@ spec:
     metadata:
       labels:
         app: reslabel
-        kubernetes.azure.com/team: payments
+        kubernetes.azure.com: payments
     spec:
       securityContext:
         runAsNonRoot: true
