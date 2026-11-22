@@ -1,0 +1,10 @@
+# S09: legacy in-tree Azure Disk provisioner. Warn -> warning, Enforce -> denied. Use disk.csi.azure.com.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: lab-intree-disk
+provisioner: kubernetes.io/azure-disk
+parameters:
+  skuName: StandardSSD_LRS
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

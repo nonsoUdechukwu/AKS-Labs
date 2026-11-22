@@ -1,0 +1,12 @@
+# S07: second Service with the same selector as 'web' (from S01). Warn -> warning, Enforce -> denied.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-duplicate
+  namespace: lab-apps
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 8080
+      targetPort: 8080

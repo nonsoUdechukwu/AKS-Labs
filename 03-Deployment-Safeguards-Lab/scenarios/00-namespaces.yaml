@@ -1,0 +1,10 @@
+# Lab namespaces. lab-legacy is listed in excluded_namespaces / excludedNamespaces.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-apps
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-legacy

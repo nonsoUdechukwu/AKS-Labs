@@ -1,0 +1,26 @@
+# Copy to .github/workflows/safeguards-preflight.yml in an app repo.
+# Fails the PR on anything Deployment Safeguards would deny; annotates mutations and warnings.
+name: safeguards-preflight
+
+on:
+  pull_request:
+    paths: ["k8s/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install pyyaml==6.0.3
+      - name: Schema check
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          ./kubeconform -strict -summary k8s/
+      - name: Deployment Safeguards preflight (match the cluster's settings)
+        run: python3 tools/preflight.py --github --level Enforce --pss Restricted k8s/
