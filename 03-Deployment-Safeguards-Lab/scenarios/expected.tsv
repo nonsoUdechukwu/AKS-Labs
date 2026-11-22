@@ -2,6 +2,7 @@
 # class drives the expected outcome per round (see expected() in scripts/run-scenarios.sh):
 #   compliant       always ADMIT
 #   ds-deny         Warn -> WARN,  Enforce -> DENY
+#   warn-only       WARN at both levels (the probes safeguard stays at warn under Enforce)
 #   ds-mutate       Warn -> WARN,  Enforce -> MUTATE (admitted after mutation)
 #   mutate-only     Warn -> ADMIT, Enforce -> MUTATE
 #   pss-baseline    ADMIT under Privileged PSS; WARN/DENY under Baseline or Restricted
@@ -9,7 +10,7 @@
 #   excluded        always ADMIT (namespace is in excludedNamespaces)
 S01	01-compliant.yaml	lab-apps	compliant	Golden path (Restricted-ready)
 S02	02-latest-tag.yaml	lab-apps	ds-deny	:latest image tag
-S03	03-no-probes.yaml	lab-apps	ds-deny	No readiness/liveness probes
+S03	03-no-probes.yaml	lab-apps	warn-only	No readiness/liveness probes
 S04	04-no-resources.yaml	lab-apps	ds-mutate	No requests/limits
 S05	05-tiny-resources.yaml	lab-apps	mutate-only	Requests below 100m/100Mi floor
 S06	06-no-anti-affinity.yaml	lab-apps	ds-mutate	3 replicas, no spread rules

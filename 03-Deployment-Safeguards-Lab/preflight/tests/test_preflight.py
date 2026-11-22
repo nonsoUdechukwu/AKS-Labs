@@ -20,6 +20,8 @@ def expected(cls: str, level: str, pss: str) -> str:
     """Python twin of expected() in scripts/run-scenarios.sh."""
     if cls in ("compliant", "excluded"):
         return "ADMIT"
+    if cls == "warn-only":
+        return "WARN"
     if cls == "ds-deny":
         return "WARN" if level == "Warn" else "DENY"
     if cls == "ds-mutate":
@@ -57,6 +59,57 @@ def test_matrix(sid, file, cls, level, pss):
 def test_excluded_namespace_is_not_exempt_when_not_listed():
     docs = preflight.load([str(SC / "13-excluded-namespace.yaml")])
     assert preflight.verdict(preflight.evaluate(docs, "Enforce", "Privileged", set())) == "DENY"
+
+
+def _verdict(text: str, level: str = "Enforce") -> str:
+    import yaml
+
+    docs = [d for d in yaml.safe_load_all(text) if d]
+    return preflight.verdict(preflight.evaluate(docs, level, "Privileged", set()))
+
+
+SVC = """
+apiVersion: v1
+kind: Service
+metadata: {{name: {name}, namespace: ns}}
+spec:
+  {extra}selector: {{app: web}}
+  ports: [{{port: {port}}}]
+"""
+
+
+@pytest.mark.parametrize(
+    "second,want",
+    [
+        (SVC.format(name="b", port=80, extra=""), "DENY"),
+        (SVC.format(name="b", port=8080, extra=""), "ADMIT"),
+        (SVC.format(name="b", port=80, extra="clusterIP: None\n  "), "ADMIT"),
+    ],
+)
+def test_unique_selector_needs_overlapping_port(second, want):
+    assert _verdict(SVC.format(name="a", port=80, extra="") + "---" + second) == want
+
+
+def test_reserved_label_is_exact_key_only():
+    s08 = (SC / "08-reserved-label.yaml").read_text()
+    assert _verdict(s08) == "DENY"
+    assert _verdict(s08.replace("kubernetes.azure.com: payments", "kubernetes.azure.com/team: payments")) == "ADMIT"
+
+
+def test_bare_pod_without_requests_is_denied():
+    pod = """
+apiVersion: v1
+kind: Pod
+metadata: {name: p, namespace: ns}
+spec:
+  containers:
+  - name: c
+    image: nginx:1.27
+    readinessProbe: {tcpSocket: {port: 80}}
+    livenessProbe: {tcpSocket: {port: 80}}
+"""
+    assert _verdict(pod) == "DENY"
+    assert _verdict(pod, "Warn") == "WARN"
 
 
 @pytest.mark.parametrize(

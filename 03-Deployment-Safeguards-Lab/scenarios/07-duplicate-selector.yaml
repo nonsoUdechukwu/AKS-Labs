@@ -1,4 +1,6 @@
-# S07: second Service with the same selector as 'web' (from S01). Warn -> warning, Enforce -> denied.
+# S07: second Service with the same selector AND an overlapping port as 'web' (from S01).
+# The safeguard only flags a clash when at least one port/protocol pair overlaps.
+# Warn -> warning, Enforce -> denied.
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,5 +10,5 @@ spec:
   selector:
     app: web
   ports:
-    - port: 8080
+    - port: 80
       targetPort: 8080

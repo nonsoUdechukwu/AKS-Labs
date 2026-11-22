@@ -30,6 +30,7 @@ expected() {
   case "$class" in
   compliant | excluded) echo ADMIT ;;
   ds-deny) [[ $LEVEL == Warn ]] && echo WARN || echo DENY ;;
+  warn-only) echo WARN ;;
   ds-mutate) [[ $LEVEL == Warn ]] && echo WARN || echo MUTATE ;;
   mutate-only) [[ $LEVEL == Warn ]] && echo ADMIT || echo MUTATE ;;
   pss-baseline | pss-restricted)
@@ -48,6 +49,7 @@ dry_run() {
   if [[ $file == "@node-label" ]]; then
     local node
     node="$(kubectl get nodes -l kubernetes.azure.com/mode=user -o name | head -n1)"
+    [[ -z $node ]] && node="$(kubectl get nodes -o name | head -n1)"
     kubectl label --dry-run=server "$node" lab.example.com/owner=me --overwrite >"$TMP/out" 2>"$TMP/err" || rc=$?
   else
     kubectl apply --dry-run=server -f "$SC/$file" >"$TMP/out" 2>"$TMP/err" || rc=$?
@@ -55,7 +57,7 @@ dry_run() {
   local evidence
   # Keep just the policy message, e.g. "[azurepolicy-k8sazurev2...] Please specify an explicit...".
   evidence="$(grep -m1 -E 'denied|Warning:|Error' "$TMP/err" |
-    sed -E 's/.*denied the request: //; s/^Warning: //' | cut -c1-180 | tr '|' '/' || true)"
+    sed -E 's/.*denied the request: //; s/.* is forbidden: //; s/^Warning: //' | cut -c1-180 | tr '|' '/' || true)"
   if ((rc != 0)) && grep -qiE 'denied|forbidden' "$TMP/err"; then
     printf 'DENY\t%s\n' "$evidence"
   elif ((rc != 0)); then
